@@ -9,11 +9,11 @@ build:
     python: "3.10"
   jobs:
     post_create_environment:
-      - pip install poetry
+      - curl -LsSf https://astral.sh/uv/install.sh | sh
+      - export PATH="$HOME/.local/bin:$PATH"
     post_install:
-      # 1. Dependencies like sphinx/-theme are in the 'dev' dependency group
-      # 2. As of poetry>1.8 we need to set VIRTUAL_ENV: https://github.com/python-poetry/poetry/issues/9025
-      - VIRTUAL_ENV=$READTHEDOCS_VIRTUALENV_PATH poetry install --with dev
+      # Install dependencies including the dev group which contains sphinx and theme
+      - export PATH="$HOME/.local/bin:$PATH" && uv sync --group dev
 
 sphinx:
   configuration: docs/source/conf.py

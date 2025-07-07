@@ -27,8 +27,8 @@ pip
 
     $ pip install "cognite-sdk[pandas, geo]"
 
-poetry
+uv
 
 .. code:: bash
 
-    $ poetry add cognite-sdk -E pandas -E geo
+    $ uv add "cognite-sdk[pandas, geo]"

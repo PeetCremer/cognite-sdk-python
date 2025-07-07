@@ -47,9 +47,9 @@ To include optional dependencies, specify them like this with pip:
 $ pip install "cognite-sdk[pandas, geo]"
 ```
 
-or like this if you are using poetry:
+or like this if you are using uv:
 ```bash
-$ poetry add cognite-sdk -E pandas -E geo
+$ uv add "cognite-sdk[pandas, geo]"
 ```
 
 ### Performance notes
