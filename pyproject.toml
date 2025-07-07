@@ -21,7 +21,7 @@ packages = [{ include="cognite", from="." }]
 [tool.poetry.dependencies]
 python = "^3.10"
 
-requests = "^2.27"
+httpx = "^0.28"
 requests_oauthlib = "^1"
 msal = "^1.31"
 protobuf = ">=4"

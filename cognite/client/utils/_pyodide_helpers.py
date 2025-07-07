@@ -3,7 +3,16 @@ from __future__ import annotations
 import os
 import warnings
 from collections.abc import Callable, MutableMapping
+from pathlib import Path
+from types import ModuleType
 from typing import TYPE_CHECKING, Any
+
+try:
+    import pyodide_http
+    from pyodide_http import patch_all
+except ImportError:
+    pyodide_http = None
+from httpx import Client as Session
 
 import cognite.client as cc  # Do not import individual entities
 from cognite.client._http_client import _RetryTracker
@@ -20,9 +29,8 @@ def patch_sdk_for_pyodide() -> None:
     # -------------------
     # Patch Pyodide related issues
     # - Patch 'requests' as it does not work in pyodide (socket not implemented):
-    from pyodide_http import patch_all
-
-    patch_all()
+    if pyodide_http:
+        patch_all()
 
     # -----------------
     # Patch Cognite SDK
