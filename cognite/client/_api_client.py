@@ -20,12 +20,9 @@ from typing import (
 )
 from urllib.parse import urljoin
 
-import requests.utils
-from requests import Response
-from requests.exceptions import JSONDecodeError as RequestsJSONDecodeError
-from requests.structures import CaseInsensitiveDict
+import httpx
 
-from cognite.client._http_client import HTTPClient, HTTPClientConfig, get_global_requests_session
+from cognite.client._http_client import HTTPClient, HTTPClientConfig, get_global_httpx_client
 from cognite.client.config import global_config
 from cognite.client.data_classes._base import (
     CogniteFilter,
@@ -127,7 +124,7 @@ class APIClient:
         self._UPDATE_LIMIT = 1000
 
     def _init_http_clients(self) -> None:
-        session = get_global_requests_session()
+        session = get_global_httpx_client()
         self._http_client = HTTPClient(
             config=HTTPClientConfig(
                 status_codes_to_retry={429},
@@ -157,12 +154,12 @@ class APIClient:
 
     def _delete(
         self, url_path: str, params: dict[str, Any] | None = None, headers: dict[str, Any] | None = None
-    ) -> Response:
+    ) -> httpx.Response:
         return self._do_request("DELETE", url_path, params=params, headers=headers, timeout=self._config.timeout)
 
     def _get(
         self, url_path: str, params: dict[str, Any] | None = None, headers: dict[str, Any] | None = None
-    ) -> Response:
+    ) -> httpx.Response:
         return self._do_request("GET", url_path, params=params, headers=headers, timeout=self._config.timeout)
 
     def _post(
@@ -172,7 +169,7 @@ class APIClient:
         params: dict[str, Any] | None = None,
         headers: dict[str, Any] | None = None,
         api_subversion: str | None = None,
-    ) -> Response:
+    ) -> httpx.Response:
         return self._do_request(
             "POST",
             url_path,
@@ -185,7 +182,7 @@ class APIClient:
 
     def _put(
         self, url_path: str, json: dict[str, Any] | None = None, headers: dict[str, Any] | None = None
-    ) -> Response:
+    ) -> httpx.Response:
         return self._do_request("PUT", url_path, json=json, headers=headers, timeout=self._config.timeout)
 
     def _do_request(
@@ -195,7 +192,7 @@ class APIClient:
         accept: str = "application/json",
         api_subversion: str | None = None,
         **kwargs: Any,
-    ) -> Response:
+    ) -> httpx.Response:
         is_retryable, full_url = self._resolve_url(method, url_path)
         json_payload = kwargs.pop("json", None)
         headers = self._configure_headers(
@@ -250,8 +247,15 @@ class APIClient:
     def _configure_headers(
         self, accept: str, additional_headers: dict[str, str], api_subversion: str | None = None
     ) -> MutableMapping[str, Any]:
-        headers: MutableMapping[str, Any] = CaseInsensitiveDict()
-        headers.update(requests.utils.default_headers())
+        # httpx.Headers are case-insensitive by default
+        headers: MutableMapping[str, Any] = httpx.Headers()
+        
+        # Set default headers (replaces requests.utils.default_headers())
+        headers["User-Agent"] = get_user_agent()
+        headers["Accept"] = "*/*"
+        headers["Accept-Encoding"] = "gzip, deflate"
+        headers["Connection"] = "keep-alive"
+        
         self._refresh_auth_header(headers)
         headers["content-type"] = "application/json"
         headers["accept"] = accept

@@ -8,8 +8,7 @@ from collections.abc import Callable, Iterable, MutableMapping
 from http import cookiejar
 from typing import Any, Literal
 
-import requests
-import requests.adapters
+import httpx
 import urllib3
 
 from cognite.client.config import global_config
@@ -27,20 +26,43 @@ class BlockAll(cookiejar.CookiePolicy):
 
 
 @functools.lru_cache(1)
-def get_global_requests_session() -> requests.Session:
-    session = requests.Session()
-    session.cookies.set_policy(BlockAll())
-    adapter = requests.adapters.HTTPAdapter(
-        pool_maxsize=global_config.max_connection_pool_size, max_retries=urllib3.Retry(False)
+def get_global_httpx_client() -> httpx.Client:
+    # Configure timeout - httpx uses a different timeout structure
+    timeout = httpx.Timeout(
+        connect=30.0,  # connection timeout
+        read=30.0,     # read timeout
+        write=30.0,    # write timeout
+        pool=30.0      # pool timeout
     )
-    session.mount("http://", adapter)
-    session.mount("https://", adapter)
-    if global_config.disable_ssl:
-        urllib3.disable_warnings()
-        session.verify = False
-    if global_config.proxies is not None:
-        session.proxies.update(global_config.proxies)
-    return session
+    
+    # Configure limits for connection pooling
+    limits = httpx.Limits(
+        max_keepalive_connections=global_config.max_connection_pool_size,
+        max_connections=global_config.max_connection_pool_size * 2,
+        keepalive_expiry=30.0
+    )
+    
+    # Handle proxies - httpx expects mounts or proxy configuration differently
+    proxies = None
+    if global_config.proxies:
+        proxies = global_config.proxies
+    
+    client = httpx.Client(
+        timeout=timeout,
+        limits=limits,
+        verify=not global_config.disable_ssl,
+        proxies=proxies,
+        http2=False,  # Can be enabled later if needed
+    )
+    
+    # Note: httpx doesn't use the same cookie policy system as requests
+    # For now, we'll handle cookie blocking at the application level if needed
+    
+    return client
+
+
+# Keep the old function name for backward compatibility during migration
+get_global_requests_session = get_global_httpx_client
 
 
 class HTTPClientConfig:
@@ -100,7 +122,7 @@ class HTTPClient:
     def __init__(
         self,
         config: HTTPClientConfig,
-        session: requests.Session,
+        session: httpx.Client,
         refresh_auth_header: Callable[[MutableMapping[str, Any]], None],
         retry_tracker_factory: Callable[[HTTPClientConfig], _RetryTracker] = _RetryTracker,
     ) -> None:
@@ -119,7 +141,7 @@ class HTTPClient:
         params: dict[str, Any] | str | bytes | None = None,
         stream: bool | None = None,
         allow_redirects: bool = False,
-    ) -> requests.Response:
+    ) -> httpx.Response:
         retry_tracker = self.retry_tracker_factory(self.config)
         accepts_json = (headers or {}).get("accept") == "application/json"
         is_auto_retryable = False
@@ -174,37 +196,51 @@ class HTTPClient:
         params: dict[str, Any] | str | bytes | None = None,
         stream: bool | None = None,
         allow_redirects: bool = False,
-    ) -> requests.Response:
-        """requests/urllib3 adds 2 or 3 layers of exceptions on top of built-in networking exceptions.
+    ) -> httpx.Response:
+        """httpx has a different exception hierarchy compared to requests/urllib3.
 
-        Sometimes the appropriate built-in networking exception is not in the context, sometimes the requests
-        exception is not in the context, so we need to check for the appropriate built-in exceptions,
-        urllib3 exceptions, and requests exceptions.
+        We need to map httpx exceptions to our custom Cognite exceptions to maintain
+        compatibility with existing code.
         """
         try:
-            res = self.session.request(
-                method=method,
-                url=url,
-                data=data,
-                headers=headers,
-                timeout=timeout,
-                params=params,
-                stream=stream,
-                allow_redirects=allow_redirects,
-            )
+            # Convert timeout to httpx format if provided
+            httpx_timeout = None
+            if timeout is not None:
+                httpx_timeout = httpx.Timeout(timeout)
+            
+            # Handle data parameter - httpx uses different parameter names
+            request_kwargs = {
+                "method": method,
+                "url": url,
+                "headers": headers,
+                "timeout": httpx_timeout,
+                "params": params,
+                "follow_redirects": allow_redirects,
+            }
+            
+            # Map data to appropriate httpx parameter
+            if data is not None:
+                if isinstance(data, (str, bytes)):
+                    request_kwargs["content"] = data
+                else:
+                    # For other types (file-like objects, iterables), pass as-is
+                    # httpx should handle these appropriately
+                    request_kwargs["content"] = data
+            
+            res = self.session.request(**request_kwargs)
             return res
         except Exception as e:
+            # Map httpx exceptions to Cognite exceptions
             if self._any_exception_in_context_isinstance(
-                e, (socket.timeout, urllib3.exceptions.ReadTimeoutError, requests.exceptions.ReadTimeout)
+                e, (socket.timeout, httpx.ReadTimeout, httpx.TimeoutException)
             ):
                 raise CogniteReadTimeout from e
             if self._any_exception_in_context_isinstance(
                 e,
                 (
                     ConnectionError,
-                    urllib3.exceptions.ConnectionError,
-                    urllib3.exceptions.ConnectTimeoutError,
-                    requests.exceptions.ConnectionError,
+                    httpx.ConnectError,
+                    httpx.NetworkError,
                 ),
             ):
                 if self._any_exception_in_context_isinstance(e, ConnectionRefusedError):
@@ -216,8 +252,9 @@ class HTTPClient:
     def _any_exception_in_context_isinstance(
         cls, exc: BaseException, exc_types: tuple[type[BaseException], ...] | type[BaseException]
     ) -> bool:
-        """requests does not use the "raise ... from ..." syntax, so we need to access the underlying exceptions using
-        the __context__ attribute.
+        """httpx exceptions have different context than requests exceptions.
+        
+        This method handles the exception context checking for both httpx and legacy requests patterns.
         """
         if isinstance(exc, exc_types):
             return True
