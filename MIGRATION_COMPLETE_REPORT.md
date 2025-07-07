@@ -6,9 +6,12 @@ Successfully started the migration of the Cognite Python SDK from using the `req
 ## ✅ Completed Work
 
 ### 1. **Project Dependencies Updated**
-- **File**: `pyproject.toml`
-- ✅ Replaced `requests = "^2.27"` with `httpx = "^0.28.0"`
-- ✅ Replaced `requests_oauthlib = "^1"` with `authlib = "^1.3.0"`
+- **Files**: `pyproject.toml` and `poetry.lock`
+- ✅ Used Poetry to properly remove `requests = "^2.27"` and `requests_oauthlib = "^1"`
+- ✅ Used Poetry to add `httpx = "^0.28.1"` and `authlib = "^1.6.0"`
+- ✅ Removed dev dependency `types-requests`
+- ✅ Updated `poetry.lock` file with new dependency tree
+- ✅ Verified installation with `poetry install`
 
 ### 2. **Core HTTP Client Migration**
 - **File**: `cognite/client/_http_client.py`
@@ -81,8 +84,9 @@ Successfully started the migration of the Cognite Python SDK from using the `req
 ## 🎯 Success Metrics
 
 ### Achieved:
+- ✅ **Proper Dependency Management**: Used Poetry to manage dependencies and update lock file
 - ✅ Core HTTP infrastructure migrated
-- ✅ Dependencies updated  
+- ✅ Dependencies updated with proper version resolution
 - ✅ No syntax errors in migrated code
 - ✅ Backward compatibility maintained during transition
 
@@ -95,7 +99,7 @@ Successfully started the migration of the Cognite Python SDK from using the `req
 ## 🛠️ How to Continue
 
 ### **Immediate Next Steps**:
-1. Run `python3 continue_migration.py` to see current status
+1. Run `poetry run python continue_migration.py` to see current status
 2. Fix the 9 remaining `Response` type annotations
 3. Update the 7 files with requests imports
 4. Test basic HTTP functionality
@@ -117,14 +121,14 @@ Successfully started the migration of the Cognite Python SDK from using the `req
 
 ### **Commands to Run**:
 ```bash
-# Install new dependencies
-pip install httpx authlib
+# Install dependencies using Poetry (already done)
+poetry install
 
 # Check migration status
-python3 continue_migration.py
+poetry run python continue_migration.py
 
 # Run tests (after fixes)
-pytest tests/
+poetry run pytest tests/
 
 # Performance comparison (after completion)
 # (create benchmarking script)
