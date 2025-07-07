@@ -31,12 +31,19 @@ def get_global_httpx_client() -> httpx.Client:
         max_keepalive_connections=global_config.max_connection_pool_size,
         max_connections=global_config.max_connection_pool_size,
     )
+    
+    # Convert requests-style proxy dict to httpx proxy format
+    proxy = None
+    if global_config.proxies:
+        # httpx expects a single proxy URL, prefer https, then http, then any protocol
+        proxy = global_config.proxies.get("https") or global_config.proxies.get("http") or next(iter(global_config.proxies.values()), None)
+    
     # Note: httpx doesn't use the same retry mechanism as requests/urllib3
     # We'll handle retries at a higher level in HTTPClient
     client = httpx.Client(
         limits=limits,
         verify=not global_config.disable_ssl,
-        proxies=global_config.proxies,
+        proxy=proxy,
         follow_redirects=False,  # We handle redirects manually like the original code
     )
     if global_config.disable_ssl:

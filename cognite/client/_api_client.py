@@ -21,9 +21,8 @@ from typing import (
 from urllib.parse import urljoin
 
 import httpx
-from httpx import Response
+from httpx import Response, Headers
 from httpx._exceptions import ResponseNotRead as HTTPXJSONDecodeError
-from httpx.structures import CaseInsensitiveDict
 
 from cognite.client._http_client import HTTPClient, HTTPClientConfig, get_global_httpx_client
 from cognite.client.config import global_config
@@ -250,7 +249,7 @@ class APIClient:
     def _configure_headers(
         self, accept: str, additional_headers: dict[str, str], api_subversion: str | None = None
     ) -> MutableMapping[str, Any]:
-        headers: MutableMapping[str, Any] = CaseInsensitiveDict()
+        headers: MutableMapping[str, Any] = Headers()
         # httpx doesn't have default_headers, but we can set basic headers manually
         headers["User-Agent"] = get_user_agent()
         self._refresh_auth_header(headers)
