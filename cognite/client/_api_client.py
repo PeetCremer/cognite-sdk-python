@@ -20,12 +20,12 @@ from typing import (
 )
 from urllib.parse import urljoin
 
-import requests.utils
-from requests import Response
-from requests.exceptions import JSONDecodeError as RequestsJSONDecodeError
-from requests.structures import CaseInsensitiveDict
+import httpx
+from httpx import Response
+from httpx._exceptions import ResponseNotRead as HTTPXJSONDecodeError
+from httpx.structures import CaseInsensitiveDict
 
-from cognite.client._http_client import HTTPClient, HTTPClientConfig, get_global_requests_session
+from cognite.client._http_client import HTTPClient, HTTPClientConfig, get_global_httpx_client
 from cognite.client.config import global_config
 from cognite.client.data_classes._base import (
     CogniteFilter,
@@ -127,7 +127,7 @@ class APIClient:
         self._UPDATE_LIMIT = 1000
 
     def _init_http_clients(self) -> None:
-        session = get_global_requests_session()
+        client = get_global_httpx_client()
         self._http_client = HTTPClient(
             config=HTTPClientConfig(
                 status_codes_to_retry={429},
@@ -138,7 +138,7 @@ class APIClient:
                 max_retries_connect=global_config.max_retries_connect,
                 max_retries_status=global_config.max_retries,
             ),
-            session=session,
+            client=client,
             refresh_auth_header=self._refresh_auth_header,
         )
         self._http_client_with_retry = HTTPClient(
@@ -151,7 +151,7 @@ class APIClient:
                 max_retries_connect=global_config.max_retries_connect,
                 max_retries_status=global_config.max_retries,
             ),
-            session=session,
+            client=client,
             refresh_auth_header=self._refresh_auth_header,
         )
 
@@ -251,17 +251,14 @@ class APIClient:
         self, accept: str, additional_headers: dict[str, str], api_subversion: str | None = None
     ) -> MutableMapping[str, Any]:
         headers: MutableMapping[str, Any] = CaseInsensitiveDict()
-        headers.update(requests.utils.default_headers())
+        # httpx doesn't have default_headers, but we can set basic headers manually
+        headers["User-Agent"] = get_user_agent()
         self._refresh_auth_header(headers)
         headers["content-type"] = "application/json"
         headers["accept"] = accept
         headers["x-cdp-sdk"] = f"CognitePythonSDK:{get_current_sdk_version()}"
         headers["x-cdp-app"] = self._config.client_name
         headers["cdf-version"] = api_subversion or self._api_subversion
-        if "User-Agent" in headers:
-            headers["User-Agent"] += f" {get_user_agent()}"
-        else:
-            headers["User-Agent"] = get_user_agent()
         headers.update(additional_headers)
         return headers
 
@@ -1377,7 +1374,7 @@ class APIClient:
     def _get_response_content_safe(res: Response) -> str:
         try:
             return _json.dumps(res.json())
-        except (JSONDecodeError, RequestsJSONDecodeError):
+        except (JSONDecodeError, HTTPXJSONDecodeError):
             pass
 
         try:
