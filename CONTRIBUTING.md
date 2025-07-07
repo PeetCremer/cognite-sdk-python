@@ -9,25 +9,24 @@ git clone https://github.com/cognitedata/cognite-sdk-python.git
 cd cognite-sdk-python
 ```
 
-We use [poetry](https://pypi.org/project/poetry/) for dependency- and virtual environment management. Make sure you use python 3.10.
+We use [uv](https://docs.astral.sh/uv/) for dependency- and virtual environment management. Make sure you use python 3.10.
 
-Install dependencies and initialize a shell within the virtual environment, with these commands:
+Install dependencies and sync the virtual environment with these commands:
 
 ```bash
-poetry install -E all
-poetry shell
+uv sync --all-extras
 ```
 
 Install pre-commit hooks to run static code checks on every commit:
 
 ```bash
-pre-commit install
+uv run pre-commit install
 ```
 
 You can also manually trigger the static checks with:
 
 ```bash
-pre-commit run --all-files
+uv run pre-commit run --all-files
 ```
 
 ### Getting access to python-sdk-test CDF project for running integration tests
@@ -73,18 +72,18 @@ COGNITE_CLIENT_ID=6b0b4266-ffa4-4b9b-8e13-ddbbc8a19ea6
 
 Initiate unit tests by running the following command from the root directory:
 
-`pytest tests/tests_unit`
+`uv run pytest tests/tests_unit`
 
 If you have appropriate credentials (see [Environment Variables](#environment-variables)), you can run the integration tests like this:
 
-`pytest tests/tests_integration`
+`uv run pytest tests/tests_integration`
 
 If you want to generate code coverage reports run:
 
 ```
-pytest tests/tests_unit --cov-report html \
-                        --cov-report xml \
-                        --cov cognite
+uv run pytest tests/tests_unit --cov-report html \
+                               --cov-report xml \
+                               --cov cognite
 ```
 
 Open `htmlcov/index.html` in the browser to navigate through the report.
@@ -92,7 +91,7 @@ Open `htmlcov/index.html` in the browser to navigate through the report.
 To speed up test runs pass the following arguments (this will parallelize across 4 processes):
 
 ```
-pytest -n4 --dist loadscope tests
+uv run pytest -n4 --dist loadscope tests
 ```
 
 #### Unit Tests for Examples in Documentation
@@ -102,7 +101,7 @@ For code examples defined in *docstrings* the doctest library is used and docstr
 For any code examples written directly in `docs/source` we are using the [sphinx doctest extension](https://www.sphinx-doc.org/en/master/usage/extensions/doctest.html) with pytest. See the `docs/source/quickstart.rst` for an example of a unit test that is setup to use some fixtures defined through pytest (`docs/source/conftest.py`). To run all the tests defined in docs run:
 
 ```
-pytest docs
+uv run pytest docs
 ```
 
 ### Updating Integration Runner Auth

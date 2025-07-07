@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
         with:
-          extras: '-E all'
+          extras: '--extra all'
 
       - name: Test full
         env:
@@ -26,7 +26,7 @@ jobs:
           COGNITE_BASE_URL: ${{ vars.CDF_BASE_URL_CD }}
           COGNITE_CLIENT_NAME: python-sdk-integration-tests
         # Testpaths are defined in the pytest.ini file:
-        run: pytest --durations=10 --cov --cov-report term --cov-report xml:coverage.xml -n8 --dist loadscope --reruns 2 --maxfail 20
+        run: uv run pytest --durations=10 --cov --cov-report term --cov-report xml:coverage.xml -n8 --dist loadscope --reruns 2 --maxfail 20
 
       - uses: codecov/codecov-action@v5
         with:
@@ -34,7 +34,7 @@ jobs:
           file: ./coverage.xml
 
       - name: Build package
-        run: poetry build
+        run: uv build
 
       - name: Build docs
         run: cd docs && make html
@@ -43,7 +43,7 @@ jobs:
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: twine upload --skip-existing --verbose dist/*
+        run: uv run twine upload --skip-existing --verbose dist/*
 
       # TODO: Make this work again
       # - name: Push code snippets to service-contracts

@@ -5,9 +5,6 @@
 mkdir -p .vscode
 cp .devcontainer/vscode.default.settings.json .vscode/settings.json
 
-# Configure Poetry to create virtual environments inside the project directory
-poetry config virtualenvs.in-project true
-
-poetry env use python3.10
-poetry install -E all
-poetry run pre-commit install
+# Sync dependencies with uv and install pre-commit hooks
+uv sync --all-extras
+uv run pre-commit install
